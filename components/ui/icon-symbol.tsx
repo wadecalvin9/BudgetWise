@@ -65,6 +65,16 @@ const MAPPING = {
   'chevron.right': 'chevron-right',
   'chart.bar.fill': 'bar-chart',
   'target': 'track-changes',
+
+  // Profile icons
+  'pencil': 'edit',
+  'checkmark.circle.fill': 'check-circle',
+  'sun': 'wb-sunny',
+  'moon': 'nightlight-round',
+  'gear': 'settings',
+  'lock.fill': 'lock',
+  'questionmark.circle.fill': 'help',
+  'info.circle.fill': 'info',
 } as IconMapping;
 
 /**

@@ -1,7 +1,7 @@
 import { SecurityService } from '@/services/securityService';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
@@ -10,6 +10,7 @@ import 'react-native-reanimated';
 
 import { ThemeProvider as CustomThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { migrateDbIfNeeded } from '@/db';
+import '@/services/notificationService'; // Init notification handler
 import { SQLiteProvider } from 'expo-sqlite';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -24,9 +25,15 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const appState = useRef(AppState.currentState);
+  const rootNavigationState = useRootNavigationState();
 
   useEffect(() => {
-    checkInitialLock();
+    if (rootNavigationState?.key) {
+      checkInitialLock();
+    }
+  }, [rootNavigationState?.key]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => {
       subscription.remove();
@@ -34,9 +41,13 @@ function RootLayoutNav() {
   }, []);
 
   const checkInitialLock = async () => {
-    const isPinEnabled = await SecurityService.isPinEnabled();
-    if (isPinEnabled) {
-      router.replace('/lock');
+    try {
+      const isPinEnabled = await SecurityService.isPinEnabled();
+      if (isPinEnabled) {
+        router.replace('/lock');
+      }
+    } catch (e) {
+      console.error('Failed to check initial lock:', e);
     }
   };
 
@@ -59,20 +70,19 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={activeTheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <SQLiteProvider databaseName="budget.db" onInit={migrateDbIfNeeded}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="recurring" options={{ headerShown: false }} />
-          <Stack.Screen name="add-recurring" options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="help" options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="onboarding" options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="security" options={{ headerShown: false }} />
-          <Stack.Screen name="lock" options={{ headerShown: false, gestureEnabled: false }} />
-          <Stack.Screen name="credits" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style={activeTheme === 'dark' ? 'light' : 'dark'} />
-      </SQLiteProvider>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="recurring" options={{ headerShown: false }} />
+        <Stack.Screen name="add-modal" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="add-recurring" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="help" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="security" options={{ headerShown: false }} />
+        <Stack.Screen name="lock" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="credits" options={{ headerShown: false }} />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+      <StatusBar style={activeTheme === 'dark' ? 'light' : 'dark'} />
     </ThemeProvider>
   );
 }
@@ -87,7 +97,9 @@ export default function RootLayout() {
 
   return (
     <CustomThemeProvider>
-      <RootLayoutNav />
+      <SQLiteProvider databaseName="budget.db" onInit={migrateDbIfNeeded}>
+        <RootLayoutNav />
+      </SQLiteProvider>
     </CustomThemeProvider>
   );
 }

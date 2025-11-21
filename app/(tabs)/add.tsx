@@ -1,5 +1,5 @@
-import { View } from 'react-native';
+import { Redirect } from 'expo-router';
 
 export default function AddPlaceholder() {
-    return <View />;
+    return <Redirect href="/add-modal" />;
 }

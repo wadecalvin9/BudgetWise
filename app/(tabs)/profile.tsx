@@ -1,11 +1,13 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
+import { cancelAllNotifications, registerForPushNotificationsAsync, scheduleDailyReminder } from '@/services/notificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type Theme = 'light' | 'dark' | 'system';
 type Currency = 'USD' | 'EUR' | 'GBP' | 'JPY' | 'INR' | 'NGN' | 'KES';
@@ -34,9 +36,61 @@ export default function ProfileScreen() {
     const [avatar, setAvatar] = useState<string | null>(null);
     const [isEditingName, setIsEditingName] = useState(false);
 
+    const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+    const [reminderTime, setReminderTime] = useState(new Date());
+    const [showTimePicker, setShowTimePicker] = useState(false);
+
     useEffect(() => {
         loadProfile();
+        loadNotificationSettings();
     }, []);
+
+    const loadNotificationSettings = async () => {
+        try {
+            const enabled = await AsyncStorage.getItem('notifications_enabled');
+            const time = await AsyncStorage.getItem('reminder_time');
+
+            if (enabled === 'true') setNotificationsEnabled(true);
+            if (time) setReminderTime(new Date(time));
+            else {
+                // Default to 8:00 PM
+                const defaultTime = new Date();
+                defaultTime.setHours(20, 0, 0, 0);
+                setReminderTime(defaultTime);
+            }
+        } catch (e) {
+            console.error('Failed to load notification settings', e);
+        }
+    };
+
+    const toggleNotifications = async (value: boolean) => {
+        if (value) {
+            const granted = await registerForPushNotificationsAsync();
+            if (!granted) {
+                Alert.alert('Permission Denied', 'Please enable notifications in your device settings to use this feature.');
+                setNotificationsEnabled(false);
+                return;
+            }
+            await scheduleDailyReminder(reminderTime.getHours(), reminderTime.getMinutes());
+        } else {
+            await cancelAllNotifications();
+        }
+        setNotificationsEnabled(value);
+        await AsyncStorage.setItem('notifications_enabled', String(value));
+    };
+
+    const handleTimeChange = async (event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') setShowTimePicker(false);
+
+        if (selectedDate) {
+            setReminderTime(selectedDate);
+            await AsyncStorage.setItem('reminder_time', selectedDate.toISOString());
+
+            if (notificationsEnabled) {
+                await scheduleDailyReminder(selectedDate.getHours(), selectedDate.getMinutes());
+            }
+        }
+    };
 
     const loadProfile = async () => {
         try {
@@ -76,7 +130,7 @@ export default function ProfileScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <Text style={[styles.header, { color: colors.text }]}>Settings</Text>
 
                 {/* Profile Section */}
@@ -89,7 +143,7 @@ export default function ProfileScreen() {
                                 <Text style={styles.avatarInitials}>{name.charAt(0)}</Text>
                             </View>
                         )}
-                        <View style={[styles.editBadge, { backgroundColor: colors.primary }]}>
+                        <View style={[styles.editBadge, { backgroundColor: colors.primary, borderColor: colors.card }]}>
                             <IconSymbol name="pencil" size={12} color="#FFF" />
                         </View>
                     </TouchableOpacity>
@@ -119,115 +173,194 @@ export default function ProfileScreen() {
                     </View>
                 </View>
 
-                {/* Theme Section */}
+                {/* Appearance Section */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Theme</Text>
-                    <View style={styles.optionsContainer}>
-                        {themes.map((t) => (
+                    <Text style={[styles.sectionTitle, { color: colors.icon }]}>APPEARANCE</Text>
+                    <View style={[styles.sectionContainer, { backgroundColor: colors.card }]}>
+                        {themes.map((t, index) => (
                             <TouchableOpacity
                                 key={t.value}
                                 style={[
-                                    styles.optionCard,
-                                    { backgroundColor: colors.card },
-                                    theme === t.value && { borderColor: colors.primary, borderWidth: 2 }
+                                    styles.row,
+                                    index < themes.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }
                                 ]}
                                 onPress={() => setTheme(t.value)}
                             >
-                                <View style={styles.optionContent}>
-                                    <Text style={[styles.optionLabel, { color: colors.text }]}>{t.label}</Text>
-                                    {theme === t.value && (
-                                        <IconSymbol name="checkmark" size={20} color={colors.primary} />
-                                    )}
+                                <View style={styles.rowContent}>
+                                    <View style={[styles.iconContainer, { backgroundColor: theme === t.value ? colors.primary + '20' : 'transparent' }]}>
+                                        <IconSymbol
+                                            name={t.icon as any}
+                                            size={20}
+                                            color={theme === t.value ? colors.primary : colors.icon}
+                                        />
+                                    </View>
+                                    <Text style={[styles.rowLabel, { color: colors.text, fontWeight: theme === t.value ? '600' : '400' }]}>
+                                        {t.label}
+                                    </Text>
                                 </View>
+                                {theme === t.value && (
+                                    <IconSymbol name="checkmark" size={20} color={colors.primary} />
+                                )}
                             </TouchableOpacity>
                         ))}
+                    </View>
+                </View>
+
+                {/* Notifications Section */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionTitle, { color: colors.icon }]}>NOTIFICATIONS</Text>
+                    <View style={[styles.sectionContainer, { backgroundColor: colors.card }]}>
+                        <View style={styles.row}>
+                            <View style={styles.rowContent}>
+                                <View style={[styles.iconContainer, { backgroundColor: notificationsEnabled ? colors.primary + '20' : 'transparent' }]}>
+                                    <IconSymbol name="bell.fill" size={20} color={notificationsEnabled ? colors.primary : colors.icon} />
+                                </View>
+                                <View>
+                                    <Text style={[styles.rowLabel, { color: colors.text }]}>Daily Reminder</Text>
+                                    {notificationsEnabled && (
+                                        <Text style={[styles.rowSubtitle, { color: colors.icon }]}>
+                                            {reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
+                            <Switch
+                                value={notificationsEnabled}
+                                onValueChange={toggleNotifications}
+                                trackColor={{ false: colors.icon + '40', true: colors.primary }}
+                                thumbColor={'#FFF'}
+                            />
+                        </View>
+
+                        {notificationsEnabled && (
+                            <View style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                                <Text style={[styles.rowLabel, { color: colors.text }]}>Reminder Time</Text>
+                                {Platform.OS === 'ios' ? (
+                                    <DateTimePicker
+                                        value={reminderTime}
+                                        mode="time"
+                                        display="compact"
+                                        onChange={handleTimeChange}
+                                        themeVariant={activeTheme === 'dark' ? 'dark' : 'light'}
+                                    />
+                                ) : (
+                                    <>
+                                        <TouchableOpacity
+                                            onPress={() => setShowTimePicker(true)}
+                                            style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.background, borderRadius: 8 }}
+                                        >
+                                            <Text style={{ color: colors.primary, fontWeight: '600' }}>
+                                                {reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </Text>
+                                        </TouchableOpacity>
+                                        {showTimePicker && (
+                                            <DateTimePicker
+                                                value={reminderTime}
+                                                mode="time"
+                                                display="default"
+                                                onChange={handleTimeChange}
+                                            />
+                                        )}
+                                    </>
+                                )}
+                            </View>
+                        )}
                     </View>
                 </View>
 
                 {/* Currency Section */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Currency</Text>
-                    <View style={styles.optionsContainer}>
-                        {currencies.map((c) => (
+                    <Text style={[styles.sectionTitle, { color: colors.icon }]}>CURRENCY</Text>
+                    <View style={[styles.sectionContainer, { backgroundColor: colors.card }]}>
+                        {currencies.map((c, index) => (
                             <TouchableOpacity
                                 key={c.code}
                                 style={[
-                                    styles.currencyCard,
-                                    { backgroundColor: colors.card },
-                                    currency === c.code && { borderColor: colors.primary, borderWidth: 2 }
+                                    styles.row,
+                                    index < currencies.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }
                                 ]}
                                 onPress={() => setCurrency(c.code)}
                             >
-                                <View style={styles.currencyContent}>
-                                    <View>
-                                        <Text style={[styles.currencySymbol, { color: colors.text }]}>{c.symbol}</Text>
-                                        <Text style={[styles.currencyCode, { color: colors.icon }]}>{c.code}</Text>
+                                <View style={styles.rowContent}>
+                                    <View style={[styles.currencyBadge, { backgroundColor: currency === c.code ? colors.primary : colors.border }]}>
+                                        <Text style={[styles.currencySymbolText, { color: currency === c.code ? '#FFF' : colors.text }]}>
+                                            {c.symbol}
+                                        </Text>
                                     </View>
-                                    <Text style={[styles.currencyName, { color: colors.text }]}>{c.name}</Text>
-                                    {currency === c.code && (
-                                        <IconSymbol name="checkmark" size={20} color={colors.primary} />
-                                    )}
+                                    <View>
+                                        <Text style={[styles.rowLabel, { color: colors.text, fontWeight: currency === c.code ? '600' : '400' }]}>
+                                            {c.name}
+                                        </Text>
+                                        <Text style={[styles.rowSubtitle, { color: colors.icon }]}>{c.code}</Text>
+                                    </View>
                                 </View>
+                                {currency === c.code && (
+                                    <IconSymbol name="checkmark" size={20} color={colors.primary} />
+                                )}
                             </TouchableOpacity>
                         ))}
                     </View>
                 </View>
 
-                {/* About & Help Section */}
+                {/* About Section */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>About</Text>
-                    <View style={styles.optionsContainer}>
+                    <Text style={[styles.sectionTitle, { color: colors.icon }]}>ABOUT</Text>
+                    <View style={[styles.sectionContainer, { backgroundColor: colors.card }]}>
                         <TouchableOpacity
-                            style={[styles.optionCard, { backgroundColor: colors.card }]}
+                            style={[styles.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}
                             onPress={() => router.push('/security')}
                         >
-                            <View style={styles.optionContent}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                    <IconSymbol name="lock.fill" size={24} color={colors.primary} />
-                                    <Text style={[styles.optionLabel, { color: colors.text }]}>Security</Text>
+                            <View style={styles.rowContent}>
+                                <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
+                                    <IconSymbol name="lock.fill" size={20} color={colors.primary} />
                                 </View>
-                                <IconSymbol name="chevron.right" size={20} color={colors.icon} />
+                                <Text style={[styles.rowLabel, { color: colors.text }]}>Security</Text>
                             </View>
+                            <IconSymbol name="chevron.right" size={20} color={colors.icon} />
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.optionCard, { backgroundColor: colors.card }]}
+                            style={[styles.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}
+                            onPress={() => router.push('/export')}
+                        >
+                            <View style={styles.rowContent}>
+                                <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
+                                    <IconSymbol name="tray" size={20} color={colors.primary} />
+                                </View>
+                                <Text style={[styles.rowLabel, { color: colors.text }]}>Export Data</Text>
+                            </View>
+                            <IconSymbol name="chevron.right" size={20} color={colors.icon} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}
                             onPress={() => router.push('/help')}
                         >
-                            <View style={styles.optionContent}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                    <IconSymbol name="questionmark.circle.fill" size={24} color={colors.primary} />
-                                    <Text style={[styles.optionLabel, { color: colors.text }]}>Help & Guide</Text>
+                            <View style={styles.rowContent}>
+                                <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
+                                    <IconSymbol name="questionmark.circle.fill" size={20} color={colors.primary} />
                                 </View>
-                                <IconSymbol name="chevron.right" size={20} color={colors.icon} />
+                                <Text style={[styles.rowLabel, { color: colors.text }]}>Help & Guide</Text>
                             </View>
+                            <IconSymbol name="chevron.right" size={20} color={colors.icon} />
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.optionCard, { backgroundColor: colors.card }]}
+                            style={styles.row}
                             onPress={() => router.push('/credits')}
                         >
-                            <View style={styles.optionContent}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                    <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
-                                    <Text style={[styles.optionLabel, { color: colors.text }]}>Credits</Text>
+                            <View style={styles.rowContent}>
+                                <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
+                                    <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
                                 </View>
-                                <IconSymbol name="chevron.right" size={20} color={colors.icon} />
+                                <Text style={[styles.rowLabel, { color: colors.text }]}>Credits</Text>
                             </View>
+                            <IconSymbol name="chevron.right" size={20} color={colors.icon} />
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* Current Settings Display */}
-                <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-                    <Text style={[styles.infoTitle, { color: colors.icon }]}>Current Settings</Text>
-                    <Text style={[styles.infoText, { color: colors.text }]}>
-                        Theme: <Text style={{ fontWeight: 'bold' }}>{theme}</Text> (Active: {activeTheme})
-                    </Text>
-                    <Text style={[styles.infoText, { color: colors.text }]}>
-                        Currency: <Text style={{ fontWeight: 'bold' }}>{currency} ({currencySymbol})</Text>
-                    </Text>
-                </View>
+                <Text style={[styles.versionText, { color: colors.icon }]}>Version 1.0.0</Text>
             </ScrollView>
         </View>
     );
@@ -238,46 +371,46 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        padding: 20,
+        paddingHorizontal: 20,
         paddingTop: 60,
-        paddingBottom: 120,
+        paddingBottom: 100,
     },
     header: {
         fontSize: 34,
         fontWeight: 'bold',
-        marginBottom: 30,
+        marginBottom: 24,
     },
     profileCard: {
         borderRadius: 20,
         padding: 20,
-        marginBottom: 30,
+        marginBottom: 32,
         flexDirection: 'row',
         alignItems: 'center',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 4,
     },
     avatarContainer: {
         position: 'relative',
         marginRight: 20,
     },
     avatar: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: 72,
+        height: 72,
+        borderRadius: 36,
     },
     avatarPlaceholder: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: 72,
+        height: 72,
+        borderRadius: 36,
         alignItems: 'center',
         justifyContent: 'center',
     },
     avatarInitials: {
         color: '#FFF',
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: 'bold',
     },
     editBadge: {
@@ -290,7 +423,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
-        borderColor: '#FFF',
     },
     profileInfo: {
         flex: 1,
@@ -302,8 +434,8 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     profileName: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: 22,
+        fontWeight: '700',
     },
     nameEditContainer: {
         flexDirection: 'row',
@@ -313,8 +445,8 @@ const styles = StyleSheet.create({
     },
     nameInput: {
         flex: 1,
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: 22,
+        fontWeight: '700',
         borderBottomWidth: 2,
         paddingVertical: 0,
     },
@@ -322,74 +454,59 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     section: {
-        marginBottom: 30,
+        marginBottom: 24,
     },
     sectionTitle: {
-        fontSize: 20,
+        fontSize: 13,
         fontWeight: '600',
-        marginBottom: 16,
+        marginBottom: 8,
+        marginLeft: 12,
+        letterSpacing: 0.5,
     },
-    optionsContainer: {
+    sectionContainer: {
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+    },
+    rowContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
         gap: 12,
     },
-    optionCard: {
-        borderRadius: 16,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    optionContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+    iconContainer: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    optionLabel: {
+    rowLabel: {
         fontSize: 16,
         fontWeight: '500',
     },
-    currencyCard: {
-        borderRadius: 16,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    currencyContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    currencySymbol: {
-        fontSize: 24,
-        fontWeight: 'bold',
-    },
-    currencyCode: {
-        fontSize: 12,
+    rowSubtitle: {
+        fontSize: 13,
         marginTop: 2,
     },
-    currencyName: {
-        fontSize: 16,
-        flex: 1,
-        marginLeft: 16,
-    },
-    infoCard: {
+    currencyBadge: {
+        width: 32,
+        height: 32,
         borderRadius: 16,
-        padding: 20,
-        marginTop: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    infoTitle: {
-        fontSize: 14,
-        marginBottom: 12,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-    },
-    infoText: {
+    currencySymbolText: {
         fontSize: 16,
-        marginBottom: 8,
+        fontWeight: 'bold',
+    },
+    versionText: {
+        textAlign: 'center',
+        fontSize: 13,
+        marginBottom: 20,
     },
 });

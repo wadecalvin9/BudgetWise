@@ -1,13 +1,14 @@
+import { checkBudgetExceeded } from '@/services/budgetService';
+import { addCategory, Category, getCategories } from '@/services/categoryService';
+import { addTransaction } from '@/services/transactionService';
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
-import { addCategory, Category, getCategories } from '@/services/categoryService';
-import { addTransaction } from '@/services/transactionService';
 
 export default function AddScreen() {
     const db = useSQLiteContext();
@@ -43,17 +44,45 @@ export default function AddScreen() {
         if (!amount || !category) return;
 
         try {
-            await addTransaction(db, {
-                amount: parseFloat(amount),
-                category,
-                description,
-                date: Date.now(),
-                type,
-            });
-            router.back();
+            const amountNum = parseFloat(amount);
+            console.log('Checking budget for:', category, 'Amount:', amountNum);
+
+            if (type === 'expense') {
+                const budgetAlert = await checkBudgetExceeded(db, category, amountNum);
+                console.log('Budget Alert Result:', budgetAlert);
+
+                if (budgetAlert?.exceeded) {
+                    Alert.alert(
+                        'Budget Alert',
+                        `This transaction will exceed your ${category} budget of ${currencySymbol}${budgetAlert.limit}.\n\nCurrent spent: ${currencySymbol}${budgetAlert.spent}\nProjected: ${currencySymbol}${budgetAlert.projected}`,
+                        [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                                text: 'Proceed',
+                                style: 'destructive',
+                                onPress: async () => await saveTransaction(amountNum)
+                            }
+                        ]
+                    );
+                    return;
+                }
+            }
+
+            await saveTransaction(amountNum);
         } catch (e) {
             console.error(e);
         }
+    };
+
+    const saveTransaction = async (amountNum: number) => {
+        await addTransaction(db, {
+            amount: amountNum,
+            category,
+            description,
+            date: Date.now(),
+            type,
+        });
+        router.back();
     };
 
     const handleAddCategory = async () => {

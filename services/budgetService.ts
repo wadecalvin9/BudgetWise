@@ -76,3 +76,34 @@ export async function getBudgetProgress(db: SQLiteDatabase): Promise<BudgetProgr
 export async function deleteBudget(db: SQLiteDatabase, category: string) {
     await db.runAsync('DELETE FROM budgets WHERE category = ?', category);
 }
+
+export async function checkBudgetExceeded(db: SQLiteDatabase, category: string, newAmount: number) {
+    // Case-insensitive check
+    const budget = await db.getFirstAsync<Budget>('SELECT * FROM budgets WHERE category LIKE ?', category);
+    if (!budget) return null;
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
+
+    const result = await db.getFirstAsync<{ total: number }>(
+        `SELECT SUM(amount) as total FROM transactions 
+         WHERE type = 'expense' AND category LIKE ? AND date >= ? AND date <= ?`,
+        category, startOfMonth, endOfMonth
+    );
+
+    const currentSpent = result?.total || 0;
+    const projectedTotal = currentSpent + newAmount;
+
+    if (projectedTotal > budget.amount) {
+        return {
+            exceeded: true,
+            limit: budget.amount,
+            spent: currentSpent,
+            projected: projectedTotal,
+            category: budget.category
+        };
+    }
+
+    return null;
+}

@@ -1,18 +1,29 @@
-import { initCategories } from '@/services/categoryService';
 import { type SQLiteDatabase } from 'expo-sqlite';
 
 const DATABASE_VERSION = 4;
 
-export async function migrateDbIfNeeded(db: SQLiteDatabase) {
-  const currentVersion = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
-  const version = currentVersion?.user_version ?? 0;
+let isMigrating = false;
 
-  if (version >= DATABASE_VERSION) {
+export async function migrateDbIfNeeded(db: SQLiteDatabase) {
+  if (isMigrating) {
+    console.log('Migration already in progress, skipping...');
     return;
   }
+  isMigrating = true;
+  console.log('Database migration started');
+  try {
+    const result = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+    const currentVersion = result?.user_version ?? 0;
+    console.log('Current DB version:', currentVersion);
 
-  if (version === 0) {
-    await db.execAsync(`
+    if (currentVersion >= DATABASE_VERSION) {
+      console.log('DB is up to date');
+      return;
+    }
+
+    if (currentVersion === 0) {
+      console.log('Creating tables...');
+      await db.execAsync(`
             CREATE TABLE IF NOT EXISTS transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 amount REAL NOT NULL,
@@ -21,6 +32,10 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
                 date INTEGER NOT NULL,
                 type TEXT NOT NULL
             );
+        `);
+      console.log('Created transactions table');
+
+      await db.execAsync(`
             CREATE TABLE IF NOT EXISTS categories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
@@ -28,12 +43,20 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
                 color TEXT,
                 type TEXT NOT NULL
             );
+        `);
+      console.log('Created categories table');
+
+      await db.execAsync(`
             CREATE TABLE IF NOT EXISTS budgets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 category TEXT NOT NULL UNIQUE,
                 amount REAL NOT NULL,
                 period TEXT NOT NULL
             );
+        `);
+      console.log('Created budgets table');
+
+      await db.execAsync(`
             CREATE TABLE IF NOT EXISTS recurring_transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 amount REAL NOT NULL,
@@ -45,8 +68,17 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
                 active INTEGER DEFAULT 1
             );
         `);
-    await initCategories(db);
-  }
+      console.log('Created recurring_transactions table');
 
-  await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
+      console.log('Initialized categories');
+    }
+
+    await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
+    console.log('Migration completed, version set to', DATABASE_VERSION);
+  } catch (error) {
+    console.error('Migration error:', error);
+    throw error; // Re-throw to see the crash if it happens
+  } finally {
+    isMigrating = false;
+  }
 }

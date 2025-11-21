@@ -106,18 +106,18 @@ export async function exportToPDF(db: SQLiteDatabase, options: ExportOptions, cu
 
 // Save and share file
 export async function saveAndShareFile(content: string, filename: string): Promise<void> {
-    const fileUri = FileSystem.documentDirectory + filename;
+    // Use cache directory for temporary export files
+    const directory = FileSystem.Paths.cache;
+    const file = new FileSystem.File(directory, filename);
 
-    // Write file
-    await FileSystem.writeAsStringAsync(fileUri, content, {
-        encoding: FileSystem.EncodingType.UTF8,
-    });
+    // Write file using new API
+    await file.write(content);
 
     // Share file
     const canShare = await Sharing.isAvailableAsync();
     if (canShare) {
-        await Sharing.shareAsync(fileUri, {
-            mimeType: filename.endsWith('.csv') ? 'text/csv' : 'text/plain',
+        await Sharing.shareAsync(file.uri, {
+            mimeType: filename.endsWith('.csv') ? 'text/csv' : 'application/pdf',
             dialogTitle: 'Export Financial Data',
         });
     } else {
