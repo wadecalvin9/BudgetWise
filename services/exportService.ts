@@ -106,8 +106,13 @@ export async function exportToPDF(db: SQLiteDatabase, options: ExportOptions, cu
 
 // Save and share file
 export async function saveAndShareFile(content: string, filename: string): Promise<void> {
+<<<<<<< HEAD
     // Use the new FileSystem API with Paths
     const directory = FileSystem.Paths.document;
+=======
+    // Use cache directory for temporary export files
+    const directory = FileSystem.Paths.cache;
+>>>>>>> 0f282162e89573e64e1a5d71bc8d5c09fd540972
     const file = new FileSystem.File(directory, filename);
 
     // Write file using new API
@@ -117,9 +122,14 @@ export async function saveAndShareFile(content: string, filename: string): Promi
     const canShare = await Sharing.isAvailableAsync();
     if (canShare) {
         await Sharing.shareAsync(file.uri, {
+<<<<<<< HEAD
             mimeType: filename.endsWith('.csv') ? 'text/csv' : 'text/plain',
             dialogTitle: 'Export Financial Data',
             UTI: filename.endsWith('.csv') ? 'public.comma-separated-values-text' : 'public.plain-text',
+=======
+            mimeType: filename.endsWith('.csv') ? 'text/csv' : 'application/pdf',
+            dialogTitle: 'Export Financial Data',
+>>>>>>> 0f282162e89573e64e1a5d71bc8d5c09fd540972
         });
     } else {
         throw new Error('Sharing is not available on this device');

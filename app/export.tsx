@@ -38,7 +38,11 @@ export default function ExportScreen() {
                 filename = `financial_report_${Date.now()}.csv`;
             } else {
                 content = await exportToPDF(db, { format, dateRange, includeBudgets: true }, currencySymbol);
+<<<<<<< HEAD
                 filename = `financial_report_${Date.now()}.txt`;
+=======
+                filename = `financial_report_${Date.now()}.pdf`;
+>>>>>>> 0f282162e89573e64e1a5d71bc8d5c09fd540972
             }
 
             await saveAndShareFile(content, filename);
@@ -92,9 +96,15 @@ export default function ExportScreen() {
                                 </View>
                                 <View>
                                     <Text style={[styles.rowLabel, { color: colors.text, fontWeight: format === 'pdf' ? '600' : '400' }]}>
+<<<<<<< HEAD
                                         Text Report
                                     </Text>
                                     <Text style={[styles.rowSubtitle, { color: colors.icon }]}>Formatted text document</Text>
+=======
+                                        PDF Report
+                                    </Text>
+                                    <Text style={[styles.rowSubtitle, { color: colors.icon }]}>Text-based report</Text>
+>>>>>>> 0f282162e89573e64e1a5d71bc8d5c09fd540972
                                 </View>
                             </View>
                             {format === 'pdf' && <IconSymbol name="checkmark" size={20} color={colors.primary} />}

@@ -23,11 +23,14 @@ const config: AIConfig = {
 
 // Generic AI request function
 async function makeAIRequest(prompt: string): Promise<string> {
+<<<<<<< HEAD
     // Validate API key
     if (!config.apiKey || config.apiKey.trim() === '') {
         throw new Error('AI API key not configured. Please set EXPO_PUBLIC_AI_API_KEY or EXPO_PUBLIC_GEMINI_API_KEY in your environment variables.');
     }
 
+=======
+>>>>>>> 0f282162e89573e64e1a5d71bc8d5c09fd540972
     switch (config.provider) {
         case 'gemini':
             return makeGeminiRequest(prompt);
@@ -44,6 +47,7 @@ async function makeAIRequest(prompt: string): Promise<string> {
 
 // Gemini implementation
 async function makeGeminiRequest(prompt: string): Promise<string> {
+<<<<<<< HEAD
     try {
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(config.apiKey);
@@ -55,10 +59,19 @@ async function makeGeminiRequest(prompt: string): Promise<string> {
         console.error('Gemini API Error:', error);
         throw new Error(`Gemini API request failed: ${error.message || 'Unknown error'}`);
     }
+=======
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(config.apiKey);
+    const model = genAI.getGenerativeModel({ model: config.model || 'gemini-2.0-flash-exp' });
+
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+>>>>>>> 0f282162e89573e64e1a5d71bc8d5c09fd540972
 }
 
 // OpenAI implementation
 async function makeOpenAIRequest(prompt: string): Promise<string> {
+<<<<<<< HEAD
     try {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -88,10 +101,27 @@ async function makeOpenAIRequest(prompt: string): Promise<string> {
         console.error('OpenAI API Error:', error);
         throw new Error(`OpenAI API request failed: ${error.message || 'Unknown error'}`);
     }
+=======
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.apiKey}`,
+        },
+        body: JSON.stringify({
+            model: config.model || 'gpt-4',
+            messages: [{ role: 'user', content: prompt }],
+        }),
+    });
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+>>>>>>> 0f282162e89573e64e1a5d71bc8d5c09fd540972
 }
 
 // OpenRouter implementation
 async function makeOpenRouterRequest(prompt: string): Promise<string> {
+<<<<<<< HEAD
     try {
         const response = await fetch(config.baseURL || 'https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
@@ -122,10 +152,28 @@ async function makeOpenRouterRequest(prompt: string): Promise<string> {
         console.error('OpenRouter API Error:', error);
         throw new Error(`OpenRouter API request failed: ${error.message || 'Unknown error'}`);
     }
+=======
+    const response = await fetch(config.baseURL || 'https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.apiKey}`,
+            'HTTP-Referer': 'https://budget-tracker.app',
+        },
+        body: JSON.stringify({
+            model: config.model || 'openai/gpt-4',
+            messages: [{ role: 'user', content: prompt }],
+        }),
+    });
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+>>>>>>> 0f282162e89573e64e1a5d71bc8d5c09fd540972
 }
 
 // Anthropic implementation
 async function makeAnthropicRequest(prompt: string): Promise<string> {
+<<<<<<< HEAD
     try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -157,6 +205,24 @@ async function makeAnthropicRequest(prompt: string): Promise<string> {
         console.error('Anthropic API Error:', error);
         throw new Error(`Anthropic API request failed: ${error.message || 'Unknown error'}`);
     }
+=======
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': config.apiKey,
+            'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+            model: config.model || 'claude-3-5-sonnet-20241022',
+            max_tokens: 1024,
+            messages: [{ role: 'user', content: prompt }],
+        }),
+    });
+
+    const data = await response.json();
+    return data.content[0].text;
+>>>>>>> 0f282162e89573e64e1a5d71bc8d5c09fd540972
 }
 
 // Public API functions
