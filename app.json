@@ -1,0 +1,79 @@
+{
+  "expo": {
+    "name": "BudgetWise",
+    "slug": "my-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.budgetwise.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#4A266A"
+      },
+      "package": "com.budgetwise.app",
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#4A266A",
+          "dark": {
+            "backgroundColor": "#4A266A"
+          }
+        }
+      ],
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": true,
+          "useSQLCipher": true,
+          "android": {
+            "openHelper": "framework"
+          },
+          "ios": {
+            "customBuildFlags": [
+              "-DSQLITE_ENABLE_FTS3",
+              "-DSQLITE_ENABLE_FTS3_PARENTHESIS",
+              "-DSQLITE_ENABLE_FTS4",
+              "-DSQLITE_ENABLE_FTS5"
+            ]
+          }
+        }
+      ],
+      "./plugins/withGradleWrapperTimeout"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e2e3769e-170d-40e5-8df4-30e6931c3527"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e2e3769e-170d-40e5-8df4-30e6931c3527"
+    },
+    "owner": "calvin404"
+  }
+}
